@@ -3,12 +3,12 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.4.20"
-    id("org.jetbrains.compose") version "0.2.0-build132"
+    kotlin("jvm") version "1.4.21"
+    id("org.jetbrains.compose") version "0.3.0-build140"
 }
 
 group = "me.lenovo"
-version = "1.0.0"
+version = "1.0"
 
 repositories {
     jcenter()
@@ -18,6 +18,9 @@ repositories {
 
 dependencies {
     implementation(compose.desktop.currentOs)
+
+    // Theme finder
+    implementation("com.github.tkuenneth:nativeparameterstoreaccess:0.1.2")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.2")
