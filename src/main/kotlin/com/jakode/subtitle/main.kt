@@ -1,78 +1,67 @@
 package com.jakode.subtitle
 
-import androidx.compose.desktop.Window
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.*
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.*
+import androidx.compose.desktop.AppWindow
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.ui.input.key.Key
+import com.github.tkuenneth.nativeparameterstoreaccess.Dconf
+import com.github.tkuenneth.nativeparameterstoreaccess.Dconf.HAS_DCONF
+import com.github.tkuenneth.nativeparameterstoreaccess.MacOSDefaults
+import com.github.tkuenneth.nativeparameterstoreaccess.NativeParameterStoreAccess.IS_MACOS
+import com.github.tkuenneth.nativeparameterstoreaccess.NativeParameterStoreAccess.IS_WINDOWS
+import com.github.tkuenneth.nativeparameterstoreaccess.WindowsRegistry
+import com.jakode.subtitle.view.funSelectAll
+import com.jakode.subtitle.view.isInDarkMode
+import com.jakode.subtitle.view.subtitleContent
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import java.util.*
+import javax.swing.SwingUtilities.invokeLater
 
-private lateinit var job: Job
+val RESOURCE_BUNDLE: ResourceBundle = ResourceBundle.getBundle("values/strings")
 
-fun main() = Window {
-    MaterialTheme {
-        val buttonState = remember { mutableStateOf(false) }
-        val text = remember { mutableStateOf("Start") }
-        val progress = remember { mutableStateOf(0F) }
-
-        Column(
-            Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Button(
-                modifier = Modifier.size(200.dp, 60.dp),
-                onClick = {
-                    CoroutineScope(Dispatchers.IO).launch {
-                        buttonState.value = if (!buttonState.value) {
-                            job = launch {
-                                repeat(100) { index ->
-                                    delay(50)
-                                    println("Job is running ${index + 1} ...")
-                                    progress.value = ((index + 1) * 1) / 100F
-                                }
-
-                                text.value = "Start Again"
-                                println("Job is done")
-                                buttonState.value = false
-                            }
-
-                            text.value = "Stop"
-                            true
-                        } else {
-                            println("Cancelling...")
-                            if (::job.isInitialized) job.cancelAndJoin()
-                            println("Job is cancelled...")
-
-                            text.value = "Start Again"
-                            false
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(15.dp),
-            ) {
-                Text(
-                    text = text.value,
-                    fontSize = 24.sp
-                )
+@ExperimentalFoundationApi
+fun main() {
+    // Live change theme OS
+    GlobalScope.launch {
+        while (isActive) {
+            val newMode = isSystemInDarkTheme()
+            if (isInDarkMode != newMode) {
+                isInDarkMode = newMode
             }
-
-            Card(
-                modifier = Modifier.padding(16.dp),
-                shape = CircleShape,
-                elevation = 0.dp
-            ) {
-                LinearProgressIndicator(
-                    progress = progress.value,
-                    modifier = Modifier.fillMaxWidth().wrapContentHeight()
-                )
-            }
+            delay(1000)
         }
     }
+    invokeLater {
+        AppWindow(title = RESOURCE_BUNDLE.getString("subtitle")).also {
+            it.keyboard.setShortcut(Key.Escape) { it.close() }
+            it.keyboard.setShortcut(Key.A) { funSelectAll() }
+        }.show {
+            subtitleContent()
+        }
+    }
+}
+
+/**
+ * Is System in dark theme
+ * @return boolean
+ */
+fun isSystemInDarkTheme(): Boolean = when {
+    IS_WINDOWS -> {
+        val result = WindowsRegistry.getWindowsRegistryEntry(
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+            "AppsUseLightTheme"
+        )
+        result == 0x0
+    }
+    IS_MACOS -> {
+        val result = MacOSDefaults.getDefaultsEntry("AppleInterfaceStyle")
+        result == "Dark"
+    }
+    HAS_DCONF -> {
+        val result = Dconf.getDconfEntry("/org/gnome/desktop/interface/gtk-theme")
+        result.toLowerCase().contains("dark")
+    }
+    else -> false
 }
